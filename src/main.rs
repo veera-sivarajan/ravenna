@@ -4,18 +4,16 @@ use std::net::TcpStream;
 fn main() -> std::io::Result<()> {
     let mut stream = TcpStream::connect("example.org:80")?;
     let message = "GET /index.html HTTP/1.0\r\nHost: example.org\r\n\r\n";
-    stream.write(message.as_bytes())?;
+    stream.write_all(message.as_bytes());
     let mut buffer = [0; 1024];
     loop {
-        if let Ok(size) = stream.read(&mut buffer) {
-            if size == 0 {
-                break;
-            } else {
+        match stream.read(&mut buffer) {
+            Ok(size) if size == 0 => break,
+            Ok(size) => {
                 let output = std::str::from_utf8(&buffer[0..size]).unwrap();
-                print!("{}", output);
+                print!("{output}");
             }
-        } else {
-            eprintln!("Error reading from server.");
+            Err(_) => eprintln!("Error reading from server."),
         }
     }
     Ok(())
