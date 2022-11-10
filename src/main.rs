@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::collections::HashMap;
 
 fn get_webpage(host: &str, path: &str, port: u16) -> std::io::Result<String> {
     let host_and_port = format!("{}:{}", host, port);
@@ -20,13 +20,13 @@ fn get_webpage(host: &str, path: &str, port: u16) -> std::io::Result<String> {
 }
 
 #[derive(Default, Debug)]
-struct WebPage {
+struct Response {
     status: String,
     header: HashMap<String, String>,
     body: String,
 }
 
-fn parse_webpage(contents: &str) -> Result<WebPage, String> {
+fn parse_webpage(contents: &str) -> Result<Response, String> {
     let mut contents_split = contents.split("\r\n\r\n");
     let Some(meta) = contents_split.next() else {
         return Err(String::from("Header not found."));
@@ -43,7 +43,7 @@ fn parse_webpage(contents: &str) -> Result<WebPage, String> {
         let value = key_value.next().unwrap().trim().to_ascii_lowercase();
         header.insert(key, value);
     }
-    Ok(WebPage {
+    Ok(Response {
         status: status.to_string(),
         header,
         body: body.to_string(),
