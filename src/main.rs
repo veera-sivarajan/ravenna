@@ -1,25 +1,58 @@
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::collections::HashMap;
 
 fn get_webpage(host: &str, path: &str, port: u16) -> std::io::Result<String> {
     let host_and_port = format!("{}:{}", host, port);
     let mut stream = TcpStream::connect(host_and_port)?;
-    let message = format!("GET {} HTTP/1.0\r\nHost: {}\r\n\r\n", path, host);
-    stream.write_all(message.as_bytes())?;
+    let request = format!("GET {} HTTP/1.0\r\nHost: {}\r\n\r\n", path, host);
+    stream.write_all(request.as_bytes())?;
     let mut buffer = [0; 1024];
-    let mut output = String::new();
+    let mut response = String::new();
     loop {
         match stream.read(&mut buffer) {
             Ok(size) if size == 0 => break,
-            Ok(size) => output.push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
+            Ok(size) => response.push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
             Err(_) => eprintln!("Error reading from server."),
         }
     }
-    Ok(output)
+    Ok(response)
+}
+
+#[derive(Default, Debug)]
+struct WebPage {
+    status: String,
+    header: HashMap<String, String>,
+    body: String,
+}
+
+fn parse_webpage(contents: &str) -> Result<WebPage, String> {
+    let mut contents_split = contents.split("\r\n\r\n");
+    let Some(meta) = contents_split.next() else {
+        return Err(String::from("Header not found."));
+    };
+    let Some(body) = contents_split.next() else {
+        return Err(String::from("Body not found."));
+    };
+    let mut meta_split = meta.split("\r\n");
+    let status = meta_split.next().unwrap();
+    let mut header = HashMap::new();
+    for line in meta_split {
+        let mut key_value = line.split(':');
+        let key = key_value.next().unwrap().to_ascii_lowercase();
+        let value = key_value.next().unwrap().trim().to_ascii_lowercase();
+        header.insert(key, value);
+    }
+    Ok(WebPage {
+        status: status.to_string(),
+        header,
+        body: body.to_string(),
+    })
 }
 
 fn main() -> std::io::Result<()> {
     let data = get_webpage("example.org", "/index.html", 80)?;
-    print!("{}", data);
+    // print!("{:?}", data);
+    println!("{:#?}", parse_webpage(&data));
     Ok(())
 }
