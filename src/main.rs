@@ -31,23 +31,27 @@ fn parse_webpage(contents: &str) -> Result<Response, String> {
     let Some(meta) = contents_split.next() else {
         return Err(String::from("Header not found."));
     };
-    let Some(body) = contents_split.next() else {
-        return Err(String::from("Body not found."));
-    };
     let mut meta_split = meta.split("\r\n");
     let status = meta_split.next().unwrap();
-    let mut header = HashMap::new();
-    for line in meta_split {
-        let mut key_value = line.split(':');
-        let key = key_value.next().unwrap().to_ascii_lowercase();
-        let value = key_value.next().unwrap().trim().to_ascii_lowercase();
-        header.insert(key, value);
+    if status.contains("200 OK") {
+        let mut header = HashMap::new();
+        for line in meta_split {
+            let mut key_value = line.split(':').map(|word| word.trim().to_ascii_lowercase());
+            let key = key_value.next().unwrap();
+            let value = key_value.next().unwrap();
+            header.insert(key, value);
+        }
+        let Some(body) = contents_split.next() else {
+            return Err(String::from("Body not found."));
+        };
+        Ok(Response {
+            status: status.to_string(),
+            header,
+            body: body.to_string(),
+        })
+    } else {
+        Err(String::from("Error fetching webpage."))
     }
-    Ok(Response {
-        status: status.to_string(),
-        header,
-        body: body.to_string(),
-    })
 }
 
 fn main() -> std::io::Result<()> {
