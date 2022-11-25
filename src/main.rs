@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::net::TcpStream;
+use std::{fmt, fmt::Display};
 
 fn get_webpage(host: &str, path: &str, port: u16) -> std::io::Result<String> {
     let host_and_port = format!("{}:{}", host, port);
@@ -24,6 +25,23 @@ struct Response {
     status: String,
     header: HashMap<String, String>,
     body: String,
+}
+
+impl Display for Response {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut buffer = String::new();
+        let mut in_angle = false;
+        for c in self.body.chars() {
+            if c == '<' {
+                in_angle = true;
+            } else if c == '>' {
+                in_angle = false;
+            } else if !in_angle {
+                buffer.push(c);
+            }
+        }
+        write!(f, "{}", buffer)
+    }
 }
 
 fn parse_webpage(contents: &str) -> Result<Response, String> {
@@ -57,6 +75,6 @@ fn parse_webpage(contents: &str) -> Result<Response, String> {
 fn main() -> std::io::Result<()> {
     let data = get_webpage("example.org", "/index.html", 80)?;
     // print!("{:?}", data);
-    println!("{:#?}", parse_webpage(&data));
+    println!("{}", parse_webpage(&data).unwrap());
     Ok(())
 }
