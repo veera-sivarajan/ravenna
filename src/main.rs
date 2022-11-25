@@ -29,7 +29,6 @@ struct Response {
 
 impl Display for Response {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buffer = String::new();
         let mut in_angle = false;
         for c in self.body.chars() {
             if c == '<' {
@@ -37,10 +36,10 @@ impl Display for Response {
             } else if c == '>' {
                 in_angle = false;
             } else if !in_angle {
-                buffer.push(c);
+                let _ = write!(f, "{}", c)?;
             }
         }
-        write!(f, "{}", buffer)
+        Ok(())
     }
 }
 
