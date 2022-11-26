@@ -36,7 +36,7 @@ impl Display for Response {
             } else if c == '>' {
                 in_angle = false;
             } else if !in_angle {
-                let _ = write!(f, "{}", c)?;
+                write!(f, "{}", c)?;
             }
         }
         Ok(())
