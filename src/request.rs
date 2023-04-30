@@ -51,7 +51,7 @@ impl From<Option<u16>> for StatusCode {
             Some(300..=399) => StatusCode::Redirection,
             Some(400..=499) => StatusCode::ClientError,
             Some(500..=599) => StatusCode::ServerError,
-            Some(_) | None => StatusCode::Unknown,
+            _ => StatusCode::Unknown,
         }
     }
 }
