@@ -1,8 +1,8 @@
-use std::net::TcpStream;
-use std::collections::HashMap;
-use std::{fmt, fmt::Display};
 use native_tls::TlsConnector;
+use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::{fmt, fmt::Display};
 
 #[derive(Default, Debug)]
 pub struct Response {
@@ -26,7 +26,9 @@ impl std::fmt::Display for RequestError {
             RequestError::E404 => write!(f, "404"),
             RequestError::E401 => write!(f, "401"),
             RequestError::E400 => write!(f, "400"),
-            RequestError::Irregular(msg) => write!(f, "Malformed HTTPS Response: `{msg}`"),
+            RequestError::Irregular(msg) => {
+                write!(f, "Malformed HTTPS Response: `{msg}`")
+            }
             _ => write!(f, "Unknown Error"),
         }
     }
@@ -34,19 +36,27 @@ impl std::fmt::Display for RequestError {
 
 impl std::error::Error for RequestError {}
 
-impl From<u16> for RequestError {
-    fn from(number: u16) -> Self {
+impl From<Option<u16>> for RequestError {
+    fn from(number: Option<u16>) -> Self {
         match number {
-            404 => RequestError::E404,
-            400 => RequestError::E400,
-            401 => RequestError::E401,
-            _ => RequestError::Unknown,
+            Some(404) => RequestError::E404,
+            Some(400) => RequestError::E400,
+            Some(401) => RequestError::E401,
+            Some(_) | None => RequestError::Unknown,
         }
     }
 }
 
 impl Response {
-    fn parse_response(contents: &str) -> Result<Response, Box<dyn std::error::Error>> {
+    fn parse_status(status: &str) -> Option<u16> {
+        let mut status_split = status.split(" ");
+        status_split.next();
+        status_split.next().and_then(|s| s.parse().ok())
+    }
+    
+    fn parse_response(
+        contents: &str,
+    ) -> Result<Response, Box<dyn std::error::Error>> {
         let mut contents_split = contents.split("\r\n\r\n");
         let Some(meta) = contents_split.next() else {
             return Err(Box::new(RequestError::Irregular("Header not found.".into())));
@@ -56,7 +66,9 @@ impl Response {
         if status.contains("200 OK") {
             let mut header = HashMap::new();
             for line in meta_split {
-                let mut key_value = line.split(':').map(|word| word.trim().to_ascii_lowercase());
+                let mut key_value = line
+                    .split(':')
+                    .map(|word| word.trim().to_ascii_lowercase());
                 let key = key_value.next().expect("Key not found.");
                 let value = key_value.next().expect("Value not found.");
                 header.insert(key, value);
@@ -70,15 +82,11 @@ impl Response {
                 body: body.to_string(),
             })
         } else {
-            let mut status_split = status.split(" ");
-            status_split.next();
-            let status = status_split.next().unwrap();
-            let status: u16 = status.parse().unwrap();
-            Err(Box::new(RequestError::from(status)))
+            let response_code = Response::parse_status(status);
+            Err(Box::new(RequestError::from(response_code)))
         }
     }
 }
-
 
 impl Display for Response {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -96,10 +104,13 @@ impl Display for Response {
     }
 }
 
-pub fn get(host: &'static str, path: &str, port: u16) -> Result<Response, Box<dyn std::error::Error>> {
+pub fn get(
+    host: &'static str,
+    path: &str,
+    port: u16,
+) -> Result<Response, Box<dyn std::error::Error>> {
     let connector = TlsConnector::new()?;
-    let host_and_port = format!("{host}:{port}");
-    let stream = TcpStream::connect(host_and_port)?;
+    let stream = TcpStream::connect(format!("{host}:{port}"))?;
     let mut stream = connector.connect(host, stream)?;
     let request = format!("GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n");
     stream.write_all(request.as_bytes())?;
@@ -108,7 +119,8 @@ pub fn get(host: &'static str, path: &str, port: u16) -> Result<Response, Box<dy
     loop {
         match stream.read(&mut buffer)? {
             0 => break,
-            size => response.push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
+            size => response
+                .push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
         }
     }
     Response::parse_response(&response)
