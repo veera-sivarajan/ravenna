@@ -18,7 +18,7 @@ pub enum StatusCode {
 #[derive(Default, Debug)]
 pub struct Response {
     status: StatusCode,
-    header: HashMap<String, String>,
+    header: HashMap<String, String>, // TODO: Make this more strongly typed. Like: ContenType(String), Length(usize), Other
     body: String,
 }
 
@@ -71,7 +71,7 @@ impl Response {
 
     fn parse_header(
         header: Option<&str>,
-    ) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+    ) -> Result<HashMap<String, String>, RequestError> {
         if let Some(header) = header {
             let mut header = header.split("\r\n");
             let status = Response::parse_status(header.next());
@@ -88,18 +88,18 @@ impl Response {
                 }
                 Ok(map)
             } else {
-                Err(Box::new(RequestError::Status(status)))
+                Err(RequestError::Status(status))
             }
         } else {
-            Err(Box::new(RequestError::Irregular(
+            Err(RequestError::Irregular(
                 "Header not found.".into(),
-            )))
+            ))
         }
     }
 
     fn parse_response(
         contents: &str,
-    ) -> Result<Response, Box<dyn std::error::Error>> {
+    ) -> Result<Response, RequestError> {
         let mut contents = contents.split("\r\n\r\n");
         let header = contents.next();
         let body = contents.last();
@@ -113,7 +113,7 @@ impl Response {
                 body: body.into(),
             })
         } else {
-            Err(Box::new(RequestError::Irregular("Body not found.".into())))
+            Err(RequestError::Irregular("Body not found.".into()))
         }
     }
 }
@@ -139,6 +139,12 @@ pub fn get(
     path: &str,
     port: u16,
 ) -> Result<Response, Box<dyn std::error::Error>> {
+    let response = get_helper(host, path, port)?;
+    let parsed_response= Response::parse_response(&response)?;
+    Ok(parsed_response)
+}
+
+fn get_helper(host: &'static str, path: &str, port: u16) -> Result<String, Box<dyn std::error::Error> {
     let connector = TlsConnector::new()?;
     let stream = TcpStream::connect(format!("{host}:{port}"))?;
     let mut stream = connector.connect(host, stream)?;
@@ -153,5 +159,6 @@ pub fn get(
                 .push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
         }
     }
-    Response::parse_response(&response)
+    Ok(response)
 }
+
