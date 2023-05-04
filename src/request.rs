@@ -17,9 +17,9 @@ pub enum StatusCode {
 
 #[derive(Default, Debug)]
 pub struct Response {
-    status: StatusCode,
-    header: HashMap<String, String>, // TODO: Make this more strongly typed. Like: ContenType(String), Length(usize), Other
-    body: String,
+    pub status: StatusCode,
+    pub header: HashMap<String, String>, // TODO: Make this more strongly typed. Like: ContenType(String), Length(usize), Other
+    pub body: String,
 }
 
 #[derive(Debug)]
@@ -59,7 +59,7 @@ impl From<Option<u16>> for StatusCode {
 impl Response {
     fn parse_status(status: Option<&str>) -> StatusCode {
         if let Some(status) = status {
-            let mut status_split = status.split(" ");
+            let mut status_split = status.split(' ');
             status_split.next();
             let status_number: Option<u16> =
                 status_split.next().and_then(|s| s.parse().ok());
@@ -78,28 +78,20 @@ impl Response {
             if let StatusCode::Successful = status {
                 let mut map = HashMap::new();
                 for line in header {
-                    let mut key_value = line
-                        .split(':')
-                        .map(|word| word.trim().to_ascii_lowercase());
-                    let key = key_value.next().expect("Key not found.");
-                    let value =
-                        key_value.next().expect("Value not found.");
-                    map.insert(key, value);
+                    if let Some((key, value)) = line.split_once(':') {
+                        map.insert(key.to_string(), value.trim().to_string());
+                    }
                 }
                 Ok(map)
             } else {
                 Err(RequestError::Status(status))
             }
         } else {
-            Err(RequestError::Irregular(
-                "Header not found.".into(),
-            ))
+            Err(RequestError::Irregular("Header not found.".into()))
         }
     }
 
-    fn parse_response(
-        contents: &str,
-    ) -> Result<Response, RequestError> {
+    fn parse_response(contents: &str) -> Result<Response, RequestError> {
         let mut contents = contents.split("\r\n\r\n");
         let header = contents.next();
         let body = contents.last();
@@ -140,14 +132,16 @@ pub fn get(
     port: u16,
 ) -> Result<Response, Box<dyn std::error::Error>> {
     let response = get_helper(host, path, port)?;
-    let parsed_response= Response::parse_response(&response)?;
-    Ok(parsed_response)
+    Response::parse_response(&response).map_err(|e| e.into())
 }
 
-fn get_helper(host: &'static str, path: &str, port: u16) -> Result<String, Box<dyn std::error::Error> {
-    let connector = TlsConnector::new()?;
+fn get_helper(
+    host: &'static str,
+    path: &str,
+    port: u16,
+) -> Result<String, Box<dyn std::error::Error>> {
     let stream = TcpStream::connect(format!("{host}:{port}"))?;
-    let mut stream = connector.connect(host, stream)?;
+    let mut stream = TlsConnector::new()?.connect(host, stream)?;
     let request = format!("GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n");
     stream.write_all(request.as_bytes())?;
     let mut buffer = [0; 1024];
@@ -161,4 +155,3 @@ fn get_helper(host: &'static str, path: &str, port: u16) -> Result<String, Box<d
     }
     Ok(response)
 }
-
