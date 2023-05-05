@@ -56,57 +56,48 @@ impl From<Option<u16>> for StatusCode {
     }
 }
 
-impl Response {
-    fn parse_status(status: Option<&str>) -> StatusCode {
-        if let Some(status) = status {
-            let mut status_split = status.split(' ');
-            status_split.next();
-            let status_number: Option<u16> =
-                status_split.next().and_then(|s| s.parse().ok());
-            StatusCode::from(status_number)
-        } else {
-            StatusCode::Unknown
-        }
+fn parse_status(status: Option<&str>) -> StatusCode {
+    if let Some(status) = status {
+        let mut status_split = status.split(' ');
+        status_split.next();
+        let status_number: Option<u16> =
+            status_split.next().and_then(|s| s.parse().ok());
+        StatusCode::from(status_number)
+    } else {
+        StatusCode::Unknown
     }
+}
 
-    fn parse_header(
-        header: Option<&str>,
-    ) -> Result<HashMap<String, String>, RequestError> {
-        if let Some(header) = header {
-            let mut header = header.split("\r\n");
-            let status = Response::parse_status(header.next());
-            if let StatusCode::Successful = status {
-                let mut map = HashMap::new();
-                for line in header {
-                    if let Some((key, value)) = line.split_once(':') {
-                        map.insert(key.to_string(), value.trim().to_string());
-                    }
-                }
-                Ok(map)
-            } else {
-                Err(RequestError::Status(status))
+fn parse_header(
+    header: &str,
+) -> Result<HashMap<String, String>, RequestError> {
+    let mut header = header.split("\r\n");
+    let status = parse_status(header.next());
+    if let StatusCode::Successful = status {
+        let mut map = HashMap::new();
+        for line in header {
+            if let Some((key, value)) = line.split_once(':') {
+                map.insert(
+                    key.to_string(),
+                    value.trim().to_string(),
+                );
             }
-        } else {
-            Err(RequestError::Irregular("Header not found.".into()))
         }
+        Ok(map)
+    } else {
+        Err(RequestError::Status(status))
     }
+}
 
-    fn parse_response(contents: &str) -> Result<Response, RequestError> {
-        let mut contents = contents.split("\r\n\r\n");
-        let header = contents.next();
-        let body = contents.last();
-
-        let header = Response::parse_header(header)?;
-
-        if let Some(body) = body {
-            Ok(Response {
-                status: StatusCode::Successful,
-                header,
-                body: body.into(),
-            })
-        } else {
-            Err(RequestError::Irregular("Body not found.".into()))
-        }
+fn parse_response(contents: &str) -> Result<Response, RequestError> {
+    if let Some((header, body)) = contents.split_once("\r\n\r\n") {
+        Ok(Response {
+            status: StatusCode::Successful,
+            header: parse_header(header)?,
+            body: body.into(),
+        })
+    } else {
+        Err(RequestError::Irregular("Body not found.".into()))
     }
 }
 
@@ -132,7 +123,7 @@ pub fn get(
     port: u16,
 ) -> Result<Response, Box<dyn std::error::Error>> {
     let response = get_helper(host, path, port)?;
-    Response::parse_response(&response).map_err(|e| e.into())
+    parse_response(&response).map_err(|e| e.into())
 }
 
 fn get_helper(
