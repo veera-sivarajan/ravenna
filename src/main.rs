@@ -27,7 +27,7 @@ impl Sandbox for BrowserWindow {
     fn update(&mut self, message: Message) {
         let Message::TextInputChanged(_url) = message;
         let data = request::get("veera.app", "/index.html", 443).unwrap();
-        self.contents = data.body;
+        self.contents = data.to_string();
     }
 
     fn view(&self) -> Element<Message> {
@@ -35,7 +35,7 @@ impl Sandbox for BrowserWindow {
             TextInput::new("This is the placeholder...", "Enter your URL")
                 .on_input(Message::TextInputChanged)
                 .padding(10),
-            text(self.contents.clone()).size(50)
+            text(self.contents.to_string()).size(10)
         ]
             .padding(20)
             .align_items(Alignment::Center)
@@ -43,14 +43,6 @@ impl Sandbox for BrowserWindow {
 
     }
 }
-
-// fn main() -> std::io::Result<()> {
-//     let data = request::get("veera.app", "/index.html", 443).unwrap();
-//     println!("status: {:?}", data.status);
-//     println!("Header: {:#?}", data.header);
-//     print!("{data}");
-//     Ok(())
-// }
 
 fn main() -> iced::Result {
     BrowserWindow::run(Settings::default())
