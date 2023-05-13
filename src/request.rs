@@ -60,27 +60,21 @@ fn parse_status(status: Option<&str>) -> StatusCode {
     if let Some(status) = status {
         let mut status_split = status.split(' ');
         status_split.next();
-        let status_number: Option<u16> =
-            status_split.next().and_then(|s| s.parse().ok());
+        let status_number: Option<u16> = status_split.next().and_then(|s| s.parse().ok());
         StatusCode::from(status_number)
     } else {
         StatusCode::Unknown
     }
 }
 
-fn parse_header(
-    header: &str,
-) -> Result<HashMap<String, String>, RequestError> {
+fn parse_header(header: &str) -> Result<HashMap<String, String>, RequestError> {
     let mut header = header.split("\r\n");
     let status = parse_status(header.next());
     if let StatusCode::Successful = status {
         let mut map = HashMap::new();
         for line in header {
             if let Some((key, value)) = line.split_once(':') {
-                map.insert(
-                    key.to_string(),
-                    value.trim().to_string(),
-                );
+                map.insert(key.to_string(), value.trim().to_string());
             }
         }
         Ok(map)
@@ -119,37 +113,25 @@ impl Display for DisplayableResponse {
                 }
                 Ok(())
             }
-            Err(_) => {
-                write!(f, "error")?;
+            Err(error) => {
+                write!(f, "{error}")?;
                 Ok(())
             }
         }
     }
 }
 
-pub fn get(
-    host: &str,
-    path: &str,
-    port: u16,
-) -> DisplayableResponse {
+pub fn get(host: &str, path: &str, port: u16) -> DisplayableResponse {
     let response = send_request(host, path, port);
     DisplayableResponse(response)
 }
 
-fn send_request(
-    host: &str,
-    path: &str,
-    port: u16,
-) -> Result<Response, Box<dyn std::error::Error>> {
+fn send_request(host: &str, path: &str, port: u16) -> Result<Response, Box<dyn std::error::Error>> {
     let response = get_helper(host, path, port)?;
     parse_response(&response).map_err(|e| e.into())
 }
 
-fn get_helper(
-    host: &str,
-    path: &str,
-    port: u16,
-) -> Result<String, Box<dyn std::error::Error>> {
+fn get_helper(host: &str, path: &str, port: u16) -> Result<String, Box<dyn std::error::Error>> {
     let stream = TcpStream::connect(format!("{host}:{port}"))?;
     let mut stream = TlsConnector::new()?.connect(host, stream)?;
     let request = format!("GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n");
@@ -159,8 +141,7 @@ fn get_helper(
     loop {
         match stream.read(&mut buffer)? {
             0 => break,
-            size => response
-                .push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
+            size => response.push_str(std::str::from_utf8(&buffer[0..size]).unwrap()),
         }
     }
     Ok(response)
