@@ -40,10 +40,9 @@ impl Application for Window {
             }
             Message::UserInputSubmitted => {
                 if !self.user_input.is_empty() {
-                    let data = request::get("veera.app",
-                                            "/index.html", 443).unwrap();
+                    let data = request::get(&self.user_input,
+                                            "/index.html", 443);
                     self.contents = data.to_string();
-                    self.user_input.clear();
                 }
                 Command::none()
             }

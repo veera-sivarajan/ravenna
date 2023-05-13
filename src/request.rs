@@ -101,24 +101,43 @@ fn parse_response(contents: &str) -> Result<Response, RequestError> {
     }
 }
 
-impl Display for Response {
+pub struct DisplayableResponse(pub Result<Response, Box<dyn std::error::Error>>);
+
+impl Display for DisplayableResponse {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut in_angle = false;
-        for c in self.body.chars() {
-            if c == '<' {
-                in_angle = true;
-            } else if c == '>' {
-                in_angle = false;
-            } else if !in_angle {
-                write!(f, "{c}")?;
+        match &self.0 {
+            Ok(response) => {
+                let mut in_angle = false;
+                for c in response.body.chars() {
+                    if c == '<' {
+                        in_angle = true;
+                    } else if c == '>' {
+                        in_angle = false;
+                    } else if !in_angle {
+                        write!(f, "{c}")?;
+                    }
+                }
+                Ok(())
+            }
+            Err(_) => {
+                write!(f, "error")?;
+                Ok(())
             }
         }
-        Ok(())
     }
 }
 
 pub fn get(
-    host: &'static str,
+    host: &str,
+    path: &str,
+    port: u16,
+) -> DisplayableResponse {
+    let response = send_request(host, path, port);
+    DisplayableResponse(response)
+}
+
+fn send_request(
+    host: &str,
     path: &str,
     port: u16,
 ) -> Result<Response, Box<dyn std::error::Error>> {
@@ -127,7 +146,7 @@ pub fn get(
 }
 
 fn get_helper(
-    host: &'static str,
+    host: &str,
     path: &str,
     port: u16,
 ) -> Result<String, Box<dyn std::error::Error>> {
